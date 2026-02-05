@@ -3,11 +3,17 @@
 import { useState } from "react";
 import words from "@/data/words.json";
 import Keyboard from "./Keyboard";
+import WordDisplay from "./WordDisplay";
 import LevelSelector from "./LevelSelector";
-import WordDisplay from "./WordsDisplay";
+import HangmanDrawing from "./HangmanDrawing";
+import ScoreBoard from "./ScoreBoard";
+import ModeSelector from "./ModeSelector";
+import WordInput from "./WordInput";
+import BackButton from "./BackButton";
 
 const MAX_WRONG = 6;
 type Level = "easy" | "medium" | "hard";
+type Mode = "single" | "multi";
 
 const hintCountMap: Record<Level, number> = {
   easy: 3,
@@ -16,18 +22,33 @@ const hintCountMap: Record<Level, number> = {
 };
 
 export default function HangmanGame() {
+  const [mode, setMode] = useState<Mode | null>(null);
   const [level, setLevel] = useState<Level | null>(null);
   const [word, setWord] = useState("");
   const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
   const [wrongGuesses, setWrongGuesses] = useState(0);
+  const [score, setScore] = useState(0);
+  const [shake, setShake] = useState(false);
 
-  function getHintLetters(word: string, count: number) {
-    const uniqueLetters = Array.from(new Set(word.split("")));
-    const shuffled = uniqueLetters.sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
+  function resetRound() {
+    setWord("");
+    setGuessedLetters([]);
+    setWrongGuesses(0);
+    setScore(0);
   }
 
-  function startGame(selectedLevel: Level) {
+  function resetAll() {
+    resetRound();
+    setLevel(null);
+    setMode(null);
+  }
+
+  function getHintLetters(word: string, count: number) {
+    const unique = Array.from(new Set(word.split("")));
+    return unique.sort(() => 0.5 - Math.random()).slice(0, count);
+  }
+
+  function startSinglePlayer(selectedLevel: Level) {
     const wordList = words[selectedLevel];
     const randomWord = wordList[Math.floor(Math.random() * wordList.length)];
     const hints = getHintLetters(randomWord, hintCountMap[selectedLevel]);
@@ -36,15 +57,30 @@ export default function HangmanGame() {
     setWord(randomWord.toLowerCase());
     setGuessedLetters(hints);
     setWrongGuesses(0);
+    setScore(0);
   }
+
+  function startMultiplayer(customWord: string) {
+    setWord(customWord.toLowerCase());
+    setGuessedLetters([]);
+    setWrongGuesses(0);
+    setScore(0);
+  }
+
+  const levelMultiplier = level === "easy" ? 1 : level === "medium" ? 1.5 : 2;
 
   function handleGuess(letter: string) {
     if (guessedLetters.includes(letter)) return;
 
     setGuessedLetters((prev) => [...prev, letter]);
 
-    if (!word.includes(letter)) {
+    if (word.includes(letter)) {
+      setScore((prev) => prev + Math.floor(10 * levelMultiplier));
+    } else {
       setWrongGuesses((prev) => prev + 1);
+      setScore((prev) => Math.max(0, prev - 5));
+      setShake(true);
+      setTimeout(() => setShake(false), 300);
     }
   }
 
@@ -53,15 +89,35 @@ export default function HangmanGame() {
   const isLoser = wrongGuesses >= MAX_WRONG;
 
   return (
-    <div className="bg-gray-800 p-8 rounded-xl shadow-xl w-full max-w-md text-center space-y-6">
+    <div
+      className={`bg-gray-800 p-8 rounded-xl shadow-xl w-full max-w-md text-center space-y-6 ${
+        shake ? "animate-shake" : ""
+      }`}
+    >
       <h1 className="text-3xl font-bold">🎯 Hangman</h1>
+      <ScoreBoard score={score} />
 
-      {!level && <LevelSelector onSelect={startGame} />}
+      {!mode && <ModeSelector onSelect={setMode} />}
 
-      {level && (
+      {mode === "single" && !level && (
         <>
-          <p className="text-sm text-gray-300">Level: {level.toUpperCase()}</p>
+          <BackButton onClick={() => setMode(null)} />
+          <LevelSelector onSelect={startSinglePlayer} />
+        </>
+      )}
 
+      {mode === "multi" && !word && (
+        <>
+          <BackButton onClick={() => setMode(null)} />
+          <WordInput onSubmit={startMultiplayer} />
+        </>
+      )}
+
+      {word && (
+        <>
+          <BackButton onClick={resetAll} />
+
+          <HangmanDrawing wrongGuesses={wrongGuesses} />
           <WordDisplay word={word} guessedLetters={guessedLetters} />
 
           <p>
@@ -78,13 +134,6 @@ export default function HangmanGame() {
           {!isWinner && !isLoser && (
             <Keyboard guessedLetters={guessedLetters} onGuess={handleGuess} />
           )}
-
-          <button
-            onClick={() => setLevel(null)}
-            className="mt-4 px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-500"
-          >
-            Restart
-          </button>
         </>
       )}
     </div>
