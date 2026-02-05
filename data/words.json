@@ -1,0 +1,11 @@
+{
+  "easy": ["cat", "dog", "sun", "book", "tree"],
+  "medium": ["planet", "guitar", "window", "garden", "silver"],
+  "hard": [
+    "javascript",
+    "framework",
+    "asynchronous",
+    "architecture",
+    "typescript"
+  ]
+}
