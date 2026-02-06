@@ -13,6 +13,7 @@ export default function DrawingBoard({ socket, roomId }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const resizeRef = useRef<() => void>(() => {});
+  const dprRef = useRef(1);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -25,6 +26,7 @@ export default function DrawingBoard({ socket, roomId }: Props) {
       if (!canvas || !container) return;
 
       const dpr = window.devicePixelRatio || 1;
+      dprRef.current = dpr;
       const rect = container.getBoundingClientRect();
       canvas.width = Math.round(rect.width * dpr);
       canvas.height = Math.round(rect.height * dpr);
@@ -48,32 +50,59 @@ export default function DrawingBoard({ socket, roomId }: Props) {
     const currentContainer = containerRef.current;
     if (currentContainer) ro.observe(currentContainer);
 
-    // Listen for remote drawing events
-    if (socket) {
-      socket.on("draw-line", (data: { x0: number; y0: number; x1: number; y1: number }) => {
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.beginPath();
-        ctx.moveTo(data.x0, data.y0);
-        ctx.lineTo(data.x1, data.y1);
-        ctx.stroke();
-      });
-
-      socket.on("clear-canvas", () => {
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        resizeRef.current();
-      });
-    }
-
     return () => {
       ro.disconnect();
-      if (socket) {
-        socket.off("draw-line");
-        socket.off("clear-canvas");
+    };
+  }, []);
+
+  // Separate effect for socket listeners
+  useEffect(() => {
+    if (!socket) {
+      console.log("Socket is null/undefined");
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    console.log(
+      "Setting up draw-line listener, socket connected:",
+      socket.connected,
+    );
+
+    const handleDrawLine = (data: {
+      x0: number;
+      y0: number;
+      x1: number;
+      y1: number;
+    }) => {
+      console.log("Remote draw received:", data);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        console.log("ERROR: No canvas context");
+        return;
       }
+      ctx.beginPath();
+      ctx.moveTo(data.x0, data.y0);
+      ctx.lineTo(data.x1, data.y1);
+      ctx.stroke();
+    };
+
+    const handleClearCanvas = () => {
+      console.log("Remote clear received");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      resizeRef.current();
+    };
+
+    socket.on("draw-line", handleDrawLine);
+    socket.on("clear-canvas", handleClearCanvas);
+
+    return () => {
+      socket.off("draw-line", handleDrawLine);
+      socket.off("clear-canvas", handleClearCanvas);
     };
   }, [socket]);
 
@@ -103,16 +132,21 @@ export default function DrawingBoard({ socket, roomId }: Props) {
     const y = e.clientY - rect.top;
     ctx.lineTo(x, y);
     ctx.stroke();
-    
+
     // Emit drawing event
     if (socket && roomId) {
-      socket.emit("draw-line", {
+      const drawData = {
         roomId,
         x0: lastPosRef.current.x,
         y0: lastPosRef.current.y,
         x1: x,
         y1: y,
-      });
+      };
+      console.log("Emitting draw-line:", drawData);
+      console.log("Socket exists:", !!socket, "RoomId exists:", !!roomId);
+      socket.emit("draw-line", drawData);
+    } else {
+      console.log("Cannot emit: socket =", socket, "roomId =", roomId);
     }
     lastPosRef.current = { x, y };
   }
@@ -137,7 +171,7 @@ export default function DrawingBoard({ socket, roomId }: Props) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     resizeRef.current();
-    
+
     // Emit clear event
     if (socket && roomId) {
       socket.emit("clear-canvas", { roomId });

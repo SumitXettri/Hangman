@@ -44,12 +44,22 @@ app.prepare().then(() => {
 
     socket.on("draw-line", ({ roomId, x0, y0, x1, y1 }) => {
       const id = roomId.trim().toUpperCase();
-      socket.to(id).emit("draw-line", { x0, y0, x1, y1 });
+      console.log(
+        "Server received draw-line from socket:",
+        socket.id,
+        "for room:",
+        id,
+        "socket rooms:",
+        socket.rooms,
+      );
+      console.log("Draw data:", { x0, y0, x1, y1 });
+      io.to(id).emit("draw-line", { x0, y0, x1, y1 });
     });
 
     socket.on("clear-canvas", ({ roomId }) => {
       const id = roomId.trim().toUpperCase();
-      socket.to(id).emit("clear-canvas");
+      console.log("Server received clear-canvas:", { id });
+      io.to(id).emit("clear-canvas");
     });
 
     socket.on("guess-letter", ({ roomId, letter }) => {
