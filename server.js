@@ -17,15 +17,15 @@ app.prepare().then(() => {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("create-room", ({ roomId, word }) => {
-      rooms[roomId] = { word, guessed: [], wrong: 0 };
+    socket.on("create-room", ({ roomId, word, level }) => {
+      rooms[roomId] = { word, guessed: [], wrong: 0, level };
       socket.join(roomId);
       console.log("Rooms after creation:", rooms); // 👈 check this
       socket.emit("room-created", roomId);
     });
 
     socket.on("join-room", ({ roomId }) => {
-      const id = roomId.trim();
+      const id = roomId.trim().toUpperCase();
       console.log("Attempting join:", id, "Current rooms:", rooms); // 👈 critical
       if (!rooms[id]) {
         console.log("Room not found:", id);
@@ -37,20 +37,35 @@ app.prepare().then(() => {
         guessed: rooms[id].guessed,
         wrong: rooms[id].wrong,
         wordLength: rooms[id].word.length,
+        word: rooms[id].word,
+        level: rooms[id].level,
       });
     });
 
     socket.on("guess-letter", ({ roomId, letter }) => {
-      const room = rooms[roomId];
+      const id = roomId.trim().toUpperCase();
+      const room = rooms[id];
       if (!room || room.guessed.includes(letter)) return;
 
       room.guessed.push(letter);
       if (!room.word.includes(letter)) room.wrong++;
 
-      io.to(roomId).emit("game-update", {
+      io.to(id).emit("game-update", {
         guessed: room.guessed,
         wrong: room.wrong,
       });
+
+      // Check for win or loss
+      const isWin = room.word.split("").every((l) => room.guessed.includes(l));
+      const isLose = room.wrong >= 6;
+
+      if (isWin || isLose) {
+        io.to(id).emit("game-ended", {
+          word: room.word,
+          isWin,
+          isLose,
+        });
+      }
     });
   });
 
