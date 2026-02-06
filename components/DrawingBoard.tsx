@@ -4,7 +4,7 @@ import React, { useRef, useEffect } from "react";
 import type { Socket } from "socket.io-client";
 
 type Props = {
-  socket?: Socket;
+  socket?: Socket | null;
   roomId?: string;
 };
 
@@ -77,6 +77,8 @@ export default function DrawingBoard({ socket, roomId }: Props) {
     };
   }, [socket]);
 
+  const lastPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
   function pointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -86,6 +88,7 @@ export default function DrawingBoard({ socket, roomId }: Props) {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    lastPosRef.current = { x, y };
     ctx.beginPath();
     ctx.moveTo(x, y);
   }
@@ -100,6 +103,18 @@ export default function DrawingBoard({ socket, roomId }: Props) {
     const y = e.clientY - rect.top;
     ctx.lineTo(x, y);
     ctx.stroke();
+    
+    // Emit drawing event
+    if (socket && roomId) {
+      socket.emit("draw-line", {
+        roomId,
+        x0: lastPosRef.current.x,
+        y0: lastPosRef.current.y,
+        x1: x,
+        y1: y,
+      });
+    }
+    lastPosRef.current = { x, y };
   }
 
   function pointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -122,6 +137,11 @@ export default function DrawingBoard({ socket, roomId }: Props) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     resizeRef.current();
+    
+    // Emit clear event
+    if (socket && roomId) {
+      socket.emit("clear-canvas", { roomId });
+    }
   }
 
   return (

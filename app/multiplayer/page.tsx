@@ -437,7 +437,7 @@ export default function MultiplayerPage() {
             <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
           </div>
           <div className="h-[calc(100%-3rem)] bg-slate-900/50 rounded-xl border border-slate-700/50">
-            <DrawingBoard />
+            <DrawingBoard socket={socket} roomId={roomId} />
           </div>
         </div>
 

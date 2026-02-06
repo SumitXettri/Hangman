@@ -42,6 +42,16 @@ app.prepare().then(() => {
       });
     });
 
+    socket.on("draw-line", ({ roomId, x0, y0, x1, y1 }) => {
+      const id = roomId.trim().toUpperCase();
+      socket.to(id).emit("draw-line", { x0, y0, x1, y1 });
+    });
+
+    socket.on("clear-canvas", ({ roomId }) => {
+      const id = roomId.trim().toUpperCase();
+      socket.to(id).emit("clear-canvas");
+    });
+
     socket.on("guess-letter", ({ roomId, letter }) => {
       const id = roomId.trim().toUpperCase();
       const room = rooms[id];
