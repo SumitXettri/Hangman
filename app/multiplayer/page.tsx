@@ -26,13 +26,13 @@ export default function MultiplayerPage() {
   const [guessed, setGuessed] = useState<string[]>([]);
   const [wrong, setWrong] = useState(0);
   const [useCustomWord, setUseCustomWord] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
 
   useEffect(() => {
     const s = getSocket(); // ✅ Get singleton socket
     setSocket(s);
 
     s.on("room-created", (id) => {
-      console.log("Room created:", id);
       setRoomId(id);
       setStage("game");
     });
@@ -46,7 +46,6 @@ export default function MultiplayerPage() {
         word: string;
         level?: Level;
       }) => {
-        console.log("Joined room:", state);
         setGuessed(state.guessed);
         setWrong(state.wrong);
         setWord(state.word);
@@ -56,7 +55,7 @@ export default function MultiplayerPage() {
     );
 
     s.on("room-error", (msg) => {
-      console.log("Room error:", msg);
+      alert("Error: " + msg);
     });
 
     s.on(
@@ -68,15 +67,24 @@ export default function MultiplayerPage() {
     );
 
     s.on("game-ended", ({ word: endWord }: { word: string }) => {
-      console.log("Game ended, word revealed:", endWord);
       setActualWord(endWord);
     });
 
-    s.on("new-round-started", ({ guessed, wrong }: { guessed: string[]; wrong: number }) => {
-      console.log("New round started, resetting game state");
-      setGuessed(guessed);
-      setWrong(wrong);
-      setActualWord("");
+    s.on(
+      "new-round-started",
+      ({ guessed, wrong }: { guessed: string[]; wrong: number }) => {
+        setGuessed(guessed);
+        setWrong(wrong);
+        setActualWord("");
+      },
+    );
+
+    s.on("player-joined", () => {
+      setShowNotification(true);
+      const timer = setTimeout(() => {
+        setShowNotification(false);
+      }, 3000);
+      return () => clearTimeout(timer);
     });
 
     return () => {
@@ -96,7 +104,9 @@ export default function MultiplayerPage() {
       selectedWord = wordList[Math.floor(Math.random() * wordList.length)];
     }
 
-    const id = selectedWord.trim().toUpperCase().slice(0, 5); // simple room code
+    const id = Math.floor(Math.random() * 100000)
+      .toString()
+      .padStart(5, "0"); // 5-digit numeric room code
 
     console.log(
       "Creating room:",
@@ -106,12 +116,12 @@ export default function MultiplayerPage() {
       "Word:",
       selectedWord.trim(),
     );
-    
+
     // Set word for host
     setWord(selectedWord.trim().toLowerCase());
     setRoomId(id);
     setStage("game");
-    
+
     socket.emit("create-room", {
       roomId: id,
       word: selectedWord.trim(),
@@ -124,8 +134,6 @@ export default function MultiplayerPage() {
   function joinRoom() {
     if (!socket) return;
     if (!roomId.trim()) return alert("Enter room code");
-
-    console.log("Attempting join:", roomId.trim());
     socket.emit("join-room", { roomId: roomId.trim() });
   }
 
@@ -456,6 +464,16 @@ export default function MultiplayerPage() {
         <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
       </div>
 
+      {/* Player Joined Notification */}
+      {showNotification && (
+        <div className="fixed inset-0 flex items-start justify-end pointer-events-none z-50 p-6">
+          <div className="pointer-events-auto bg-linear-to-r from-green-600 to-emerald-600 text-white px-8 py-5 rounded-xl shadow-2xl border border-green-400/80 flex items-center gap-4 animate-slide-in-right">
+            <span className="text-3xl animate-bounce">✅</span>
+            <span className="font-bold text-lg">New player connected!</span>
+          </div>
+        </div>
+      )}
+
       <div className="relative z-10 flex flex-col lg:flex-row gap-4 sm:gap-6 w-full max-w-7xl">
         {/* Drawing area - hidden on mobile, visible on desktop */}
         <div className="hidden lg:block lg:w-2/5 bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-2xl border border-slate-700/50 h-[85vh]">
@@ -624,8 +642,21 @@ export default function MultiplayerPage() {
             transform: translate(-20px, 20px) scale(0.9);
           }
         }
+        @keyframes slide-in-right {
+          from {
+            opacity: 0;
+            transform: translateX(400px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
         .animate-blob {
           animation: blob 7s infinite;
+        }
+        .animate-slide-in-right {
+          animation: slide-in-right 0.4s ease-out;
         }
         .animation-delay-2000 {
           animation-delay: 2s;

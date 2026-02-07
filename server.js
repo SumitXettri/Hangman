@@ -15,24 +15,21 @@ app.prepare().then(() => {
   const io = new Server(httpServer);
 
   io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
 
     socket.on("create-room", ({ roomId, word, level }) => {
       rooms[roomId] = { word, guessed: [], wrong: 0, level };
       socket.join(roomId);
-      console.log("Rooms after creation:", rooms); // 👈 check this
       socket.emit("room-created", roomId);
     });
 
     socket.on("join-room", ({ roomId }) => {
       const id = roomId.trim().toUpperCase();
-      console.log("Attempting join:", id, "Current rooms:", rooms); // 👈 critical
       if (!rooms[id]) {
-        console.log("Room not found:", id);
         return socket.emit("room-error", "Room not found");
       }
 
       socket.join(id);
+      
       socket.emit("room-joined", {
         guessed: rooms[id].guessed,
         wrong: rooms[id].wrong,
@@ -40,25 +37,18 @@ app.prepare().then(() => {
         word: rooms[id].word,
         level: rooms[id].level,
       });
+
+      // Notify other players in the room that someone joined
+      socket.to(id).emit("player-joined");
     });
 
     socket.on("draw-line", ({ roomId, x0, y0, x1, y1 }) => {
       const id = roomId.trim().toUpperCase();
-      console.log(
-        "Server received draw-line from socket:",
-        socket.id,
-        "for room:",
-        id,
-        "socket rooms:",
-        socket.rooms,
-      );
-      console.log("Draw data:", { x0, y0, x1, y1 });
       io.to(id).emit("draw-line", { x0, y0, x1, y1 });
     });
 
     socket.on("clear-canvas", ({ roomId }) => {
       const id = roomId.trim().toUpperCase();
-      console.log("Server received clear-canvas:", { id });
       io.to(id).emit("clear-canvas");
     });
 
@@ -93,7 +83,6 @@ app.prepare().then(() => {
       if (rooms[id]) {
         // Reset game state with new word
         rooms[id] = { word, guessed: [], wrong: 0, level };
-        console.log("New round started in room:", id, "New word:", word);
         
         // Notify all players in the room
         io.to(id).emit("new-round-started", {
