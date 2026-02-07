@@ -87,6 +87,22 @@ app.prepare().then(() => {
         });
       }
     });
+
+    socket.on("new-round", ({ roomId, word, level }) => {
+      const id = roomId.trim().toUpperCase();
+      if (rooms[id]) {
+        // Reset game state with new word
+        rooms[id] = { word, guessed: [], wrong: 0, level };
+        console.log("New round started in room:", id, "New word:", word);
+        
+        // Notify all players in the room
+        io.to(id).emit("new-round-started", {
+          guessed: [],
+          wrong: 0,
+          wordLength: word.length,
+        });
+      }
+    });
   });
 
   // ✅ Next.js routes

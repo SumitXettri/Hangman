@@ -72,6 +72,13 @@ export default function MultiplayerPage() {
       setActualWord(endWord);
     });
 
+    s.on("new-round-started", ({ guessed, wrong }: { guessed: string[]; wrong: number }) => {
+      console.log("New round started, resetting game state");
+      setGuessed(guessed);
+      setWrong(wrong);
+      setActualWord("");
+    });
+
     return () => {
       s.off();
     };
@@ -125,6 +132,28 @@ export default function MultiplayerPage() {
   // Guess letter
   function guess(letter: string) {
     socket?.emit("guess-letter", { roomId, letter });
+  }
+
+  // Play again - new round in same room
+  function playAgain() {
+    if (!socket || !level) return;
+
+    // Generate new word from word list
+    const wordList = words[level];
+    const newWord = wordList[Math.floor(Math.random() * wordList.length)];
+
+    // Reset game state
+    setGuessed([]);
+    setWrong(0);
+    setWord(newWord.trim().toLowerCase());
+    setActualWord("");
+
+    // Emit new round event to server
+    socket.emit("new-round", {
+      roomId,
+      word: newWord.trim(),
+      level,
+    });
   }
 
   const isWinner = word && word.split("").every((l) => guessed.includes(l));
@@ -480,34 +509,84 @@ export default function MultiplayerPage() {
           </div>
 
           {isWinner && (
-            <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4 sm:p-6 text-center animate-bounce">
-              <p className="text-green-400 text-xl sm:text-2xl font-bold">
-                🎉 Victory!
-              </p>
-              <p className="text-green-300/80 text-xs sm:text-sm mt-2">
-                You guessed the word!
-              </p>
-              {actualWord && (
-                <p className="text-green-300 text-lg sm:text-xl font-bold mt-3 uppercase tracking-widest">
-                  Answer: {actualWord}
+            <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4 sm:p-6 text-center animate-bounce space-y-4">
+              <div>
+                <p className="text-green-400 text-xl sm:text-2xl font-bold">
+                  🎉 Victory!
                 </p>
-              )}
+                <p className="text-green-300/80 text-xs sm:text-sm mt-2">
+                  You guessed the word!
+                </p>
+                {actualWord && (
+                  <p className="text-green-300 text-lg sm:text-xl font-bold mt-3 uppercase tracking-widest">
+                    Answer: {actualWord}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={playAgain}
+                  className="flex-1 group relative bg-linear-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-green-500/50 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-linear-to-r from-transparent via-white to-transparent opacity-0 group-hover:opacity-30 transform -skew-x-12 group-hover:translate-x-full transition-all duration-700"></div>
+                  <span className="relative">Play Again 🔄</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setStage("menu");
+                    setWord("");
+                    setActualWord("");
+                    setGuessed([]);
+                    setWrong(0);
+                    setRoomId("");
+                    setLevel(null);
+                  }}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300"
+                >
+                  Back to Menu
+                </button>
+              </div>
             </div>
           )}
 
           {isLoser && (
-            <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 sm:p-6 text-center">
-              <p className="text-red-400 text-xl sm:text-2xl font-bold">
-                💀 Game Over
-              </p>
-              <p className="text-red-300/80 text-xs sm:text-sm mt-2">
-                Better luck next time!
-              </p>
-              {actualWord && (
-                <p className="text-red-300 text-lg sm:text-xl font-bold mt-3 uppercase tracking-widest">
-                  Answer: {actualWord}
+            <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 sm:p-6 text-center space-y-4">
+              <div>
+                <p className="text-red-400 text-xl sm:text-2xl font-bold">
+                  💀 Game Over
                 </p>
-              )}
+                <p className="text-red-300/80 text-xs sm:text-sm mt-2">
+                  Better luck next time!
+                </p>
+                {actualWord && (
+                  <p className="text-red-300 text-lg sm:text-xl font-bold mt-3 uppercase tracking-widest">
+                    Answer: {actualWord}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={playAgain}
+                  className="flex-1 group relative bg-linear-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-amber-500/50 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-linear-to-r from-transparent via-white to-transparent opacity-0 group-hover:opacity-30 transform -skew-x-12 group-hover:translate-x-full transition-all duration-700"></div>
+                  <span className="relative">Try Again 🔄</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setStage("menu");
+                    setWord("");
+                    setActualWord("");
+                    setGuessed([]);
+                    setWrong(0);
+                    setRoomId("");
+                    setLevel(null);
+                  }}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300"
+                >
+                  Back to Menu
+                </button>
+              </div>
             </div>
           )}
 
